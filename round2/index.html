@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connecting the Dots - Intelligent PDF Reader</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            margin: 20px;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar {
+            width: 350px;
+            background: linear-gradient(145deg, #f8f9ff, #e8ecff);
+            border-right: 1px solid #e0e6ff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            padding: 25px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .sidebar-header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .upload-section {
+            padding: 25px;
+            border-bottom: 1px solid #e0e6ff;
+        }
+
+        .upload-area {
+            border: 2px dashed #4facfe;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            background: rgba(79, 172, 254, 0.05);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .upload-area:hover {
+            border-color: #00f2fe;
+            background: rgba(79, 172, 254, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .upload-area.dragover {
+            border-color: #00f2fe;
+            background: rgba(79, 172, 254, 0.15);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: #4facfe;
+            margin-bottom: 15px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .outline-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 25px;
+        }
+
+        .outline-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #4a5568;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .outline-item {
+            margin-bottom: 8px;
+            padding: 12px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        .outline-item:hover {
+            background: rgba(79, 172, 254, 0.1);
+            border-left-color: #4facfe;
+            transform: translateX(5px);
+        }
+
+        .outline-item.active {
+            background: linear-gradient(135deg, #4facfe, #00f2fe);
+            color: white;
+            border-left-color: #00f2fe;
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .outline-item.h1 {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .outline-item.h2 {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-left: 20px;
+            opacity: 0.8;
+        }
+
+        .outline-item.h3 {
+            font-weight: 400;
+            font-size: 0.85rem;
+            margin-left: 40px;
+            opacity: 0.7;
+        }
+
+        .page-number {
+            font-size: 0.8rem;
+            opacity: 0.6;
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 8px;
+            border-radius: 12px;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            position: relative;
+        }
+
+        .toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 25px;
+            background: linear-gradient(90deg, #f8f9ff, #fff);
+            border-bottom: 1px solid #e0e6ff;
+        }
+
+        .toolbar-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toolbar-button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            background: #4facfe;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .toolbar-button:hover {
+            background: #00f2fe;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .toolbar-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .zoom-input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .pdf-viewer {
+            flex: 1;
+            position: relative;
+            overflow: auto;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+        }
+
+        .pdf-canvas {
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            background: white;
+            transition: all 0.3s ease;
+        }
+
+        .pdf-canvas:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #666;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #4facfe;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .insights-panel {
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            width: 300px;
+            max-height: 400px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(79, 172, 254, 0.2);
+            display: none;
+            overflow-y: auto;
+        }
+
+        .insights-panel.visible {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .insights-title {
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .insight-item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: rgba(79, 172, 254, 0.05);
+            border-left: 3px solid #4facfe;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .welcome-icon {
+            font-size: 5rem;
+            color: #4facfe;
+            margin-bottom: 30px;
+            opacity: 0.7;
+        }
+
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4a5568;
+            margin-bottom: 15px;
+        }
+
+        .welcome-text {
+            font-size: 1.1rem;
+            color: #718096;
+            max-width: 500px;
+            line-height: 1.6;
+        }
+
+        .error-message {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px;
+            border-left: 4px solid #e53e3e;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                margin: 10px;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: 300px;
+            }
+            
+            .insights-panel {
+                position: relative;
+                top: 0;
+                right: 0;
+                width: 100%;
+                margin-top: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>📚 PDF Intelligence</h1>
+                <p>Connecting the Dots in Your Documents</p>
+            </div>
+            
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📄</div>
+                    <p><strong>Drop PDF here</strong> or click to browse</p>
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf">
+                </div>
+            </div>
+            
+            <div class="outline-section">
+                <div class="outline-title">
+                    <span>🗂️</span>
+                    <span>Document Outline</span>
+                </div>
+                <div id="outlineContainer">
+                    <p style="color: #999; text-align: center; margin-top: 50px;">
+                        Upload a PDF to see its structure
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button class="toolbar-button" id="prevPage" disabled>← Previous</button>
+                    <span id="pageInfo">Page 0 of 0</span>
+                    <button class="toolbar-button" id="nextPage" disabled>Next →</button>
+                </div>
+                
+                <div class="zoom-controls">
+                    <button class="toolbar-button" id="zoomOut">-</button>
+                    <input type="number" id="zoomLevel" class="zoom-input" value="100" min="50" max="200">
+                    <span>%</span>
+                    <button class="toolbar-button" id="zoomIn">+</button>
+                    <button class="toolbar-button" id="showInsights">💡 Insights</button>
+                </div>
+            </div>
+            
+            <div class="pdf-viewer" id="pdfViewer">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">📖</div>
+                    <h2 class="welcome-title">Intelligent PDF Reading</h2>
+                    <p class="welcome-text">
+                        Upload a PDF document to experience the future of reading. 
+                        Our AI will extract the structure, highlight key insights, 
+                        and help you navigate through complex documents with ease.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="insights-panel" id="insightsPanel">
+                <div class="insights-title">
+                    <span>🧠</span>
+                    <span>AI Insights</span>
+                </div>
+                <div id="insightsContent">
+                    <div class="insight-item">
+                        <strong>Document Structure:</strong> This document contains well-organized sections with clear hierarchical headings.
+                    </div>
+                    <div class="insight-item">
+                        <strong>Key Topics:</strong> The main themes appear to focus on methodology, results, and conclusions.
+                    </div>
+                    <div class="insight-item">
+                        <strong>Reading Recommendation:</strong> Start with the abstract and conclusion for a quick overview.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class IntelligentPDFReader {
+            constructor() {
+                this.pdfDoc = null;
+                this.pageNum = 1;
+                this.pageCount = 0;
+                this.scale = 1.0;
+                this.outline = null;
+                this.canvas = null;
+                this.ctx = null;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.setupPDFWorker();
+            }
+            
+            setupPDFWorker() {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            }
+            
+            initializeElements() {
+                this.fileInput = document.getElementById('fileInput');
+                this.uploadArea = document.getElementById('uploadArea');
+                this.pdfViewer = document.getElementById('pdfViewer');
+                this.outlineContainer = document.getElementById('outlineContainer');
+                this.pageInfo = document.getElementById('pageInfo');
+                this.prevPageBtn = document.getElementById('prevPage');
+                this.nextPageBtn = document.getElementById('nextPage');
+                this.zoomInBtn = document.getElementById('zoomIn');
+                this.zoomOutBtn = document.getElementById('zoomOut');
+                this.zoomLevel = document.getElementById('zoomLevel');
+                this.showInsightsBtn = document.getElementById('showInsights');
+                this.insightsPanel = document.getElementById('insightsPanel');
+            }
+            
+            setupEventListeners() {
+                // File upload events
+                this.uploadArea.addEventListener('click', () => this.fileInput.click());
+                this.uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
+                this.uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
+                this.uploadArea.addEventListener('drop', this.handleFileDrop.bind(this));
+                this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
+                
+                // Navigation events
+                this.prevPageBtn.addEventListener('click', () => this.changePage(-1));
+                this.nextPageBtn.addEventListener('click', () => this.changePage(1));
+                
+                // Zoom events
+                this.zoomInBtn.addEventListener('click', () => this.changeZoom(0.1));
+                this.zoomOutBtn.addEventListener('click', () => this.changeZoom(-0.1));
+                this.zoomLevel.addEventListener('change', () => {
+                    this.scale = parseInt(this.zoomLevel.value) / 100;
+                    this.renderPage();
+                });
+                
+                // Insights panel
+                this.showInsightsBtn.addEventListener('click', this.toggleInsights.bind(this));
+            }
+            
+            handleDragOver(e) {
+                e.preventDefault();
+                this.uploadArea.classList.add('dragover');
+            }
+            
+            handleDragLeave(e) {
+                e.preventDefault();
+                this.uploadArea.classList.remove('dragover');
+            }
+            
+            handleFileDrop(e) {
+                e.preventDefault();
+                this.uploadArea.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type === 'application/pdf') {
+                    this.loadPDF(files[0]);
+                }
+            }
+            
+            handleFileSelect(e) {
+                const file = e.target.files[0];
+                if (file && file.type === 'application/pdf') {
+                    this.loadPDF(file);
+                }
+            }
+            
+            async loadPDF(file) {
+                try {
+                    this.showLoading();
+                    
+                    const arrayBuffer = await file.arrayBuffer();
+                    this.pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                    this.pageCount = this.pdfDoc.numPages;
+                    this.pageNum = 1;
+                    
+                    // Extract outline and render first page
+                    await this.extractOutline();
+                    await this.renderPage();
+                    this.updateUI();
+                    
+                } catch (error) {
+                    console.error('Error loading PDF:', error);
+                    this.showError('Failed to load PDF. Please try again.');
+                }
+            }
+            
+            showLoading() {
+                this.pdfViewer.innerHTML = `
+                    <div class="loading">
+                        <div class="loading-spinner"></div>
+                        <p>Processing PDF...</p>
+                    </div>
+                `;
+            }
+            
+            showError(message) {
+                this.pdfViewer.innerHTML = `
+                    <div class="error-message">
+                        <strong>Error:</strong> ${message}
+                    </div>
+                `;
+            }
+            
+            async extractOutline() {
+                try {
+                    // Simple outline extraction using text analysis
+                    const outline = [];
+                    
+                    // Check first few pages for headings
+                    const pagesToCheck = Math.min(5, this.pageCount);
+                    
+                    for (let i = 1; i <= pagesToCheck; i++) {
+                        const page = await this.pdfDoc.getPage(i);
+                        const textContent = await page.getTextContent();
+                        
+                        let previousY = null;
+                        let currentText = '';
+                        
+                        for (const item of textContent.items) {
+                            // Detect potential headings based on font size and position
+                            if (item.height > 14 && item.str.trim()) {
+                                const text = item.str.trim();
+                                
+                                // Simple heuristics for heading detection
+                                if (this.isLikelyHeading(text, item.height)) {
+                                    const level = this.determineHeadingLevel(item.height);
+                                    outline.push({
+                                        level: level,
+                                        text: text,
+                                        page: i
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    
+                    this.outline = outline;
+                    this.renderOutline();
+                    
+                } catch (error) {
+                    console.error('Error extracting outline:', error);
+                    this.outline = [];
+                }
+            }
+            
+            isLikelyHeading(text, fontSize) {
+                // Heuristics for heading detection
+                const headingPatterns = [
+                    /^\d+\.?\s+[A-Z]/,  // Numbered headings
+                    /^[A-Z][A-Z\s]{5,}$/,  // ALL CAPS
+                    /^(Introduction|Abstract|Conclusion|Results|Discussion|Methodology|Background|Summary)/i,
+                    /^Chapter\s+\d+/i,
+                    /^Section\s+\d+/i
+                ];
+                
+                return headingPatterns.some(pattern => pattern.test(text)) || 
+                       (fontSize > 16 && text.length < 100 && text.length > 5);
+            }
+            
+            determineHeadingLevel(fontSize) {
+                if (fontSize >= 20) return 'H1';
+                if (fontSize >= 16) return 'H2';
+                return 'H3';
+            }
+            
+            renderOutline() {
+                if (!this.outline || this.outline.length === 0) {
+                    this.outlineContainer.innerHTML = `
+                        <p style="color: #999; text-align: center; margin-top: 50px;">
+                            No outline detected in this document
+                        </p>
+                    `;
+                    return;
+                }
+                
+                const outlineHTML = this.outline.map((item, index) => `
+                    <div class="outline-item ${item.level.toLowerCase()}" 
+                         onclick="pdfReader.goToPage(${item.page})"
+                         data-page="${item.page}">
+                        <span>${item.text}</span>
+                        <span class="page-number">${item.page}</span>
+                    </div>
+                `).join('');
+                
+                this.outlineContainer.innerHTML = outlineHTML;
+            }
+            
+            async renderPage() {
+                if (!this.pdfDoc) return;
+                
+                try {
+                    const page = await this.pdfDoc.getPage(this.pageNum);
+                    const viewport = page.getViewport({ scale: this.scale });
+                    
+                    // Create canvas if it doesn't exist
+                    if (!this.canvas) {
+                        this.canvas = document.createElement('canvas');
+                        this.canvas.className = 'pdf-canvas';
+                        this.ctx = this.canvas.getContext('2d');
+                    }
+                    
+                    // Set canvas dimensions
+                    this.canvas.height = viewport.height;
+                    this.canvas.width = viewport.width;
+                    
+                    // Clear previous content and add canvas
+                    this.pdfViewer.innerHTML = '';
+                    this.pdfViewer.appendChild(this.canvas);
+                    
+                    // Render PDF page
+                    const renderContext = {
+                        canvasContext: this.ctx,
+                        viewport: viewport
+                    };
+                    
+                    await page.render(renderContext).promise;
+                    
+                } catch (error) {
+                    console.error('Error rendering page:', error);
+                    this.showError('Failed to render PDF page.');
+                }
+            }
+            
+            updateUI() {
+                this.pageInfo.textContent = `Page ${this.pageNum} of ${this.pageCount}`;
+                this.prevPageBtn.disabled = this.pageNum <= 1;
+                this.nextPageBtn.disabled = this.pageNum >= this.pageCount;
+                this.zoomLevel.value = Math.round(this.scale * 100);
+                
+                // Update active outline item
+                document.querySelectorAll('.outline-item').forEach(item => {
+                    item.classList.remove('active');
+                    if (parseInt(item.dataset.page) === this.pageNum) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+            
+            changePage(delta) {
+                const newPage = this.pageNum + delta;
+                if (newPage >= 1 && newPage <= this.pageCount) {
+                    this.pageNum = newPage;
+                    this.renderPage();
+                    this.updateUI();
+                }
+            }
+            
+            goToPage(pageNum) {
+                if (pageNum >= 1 && pageNum <= this.pageCount) {
+                    this.pageNum = pageNum;
+                    this.renderPage();
+                    this.updateUI();
+                }
+            }
+            
+            changeZoom(delta) {
+                const newScale = Math.max(0.5, Math.min(2.0, this.scale + delta));
+                this.scale = newScale;
+                this.renderPage();
+                this.updateUI();
+            }
+            
+            toggleInsights() {
+                this.insightsPanel.classList.toggle('visible');
+                
+                if (this.insightsPanel.classList.contains('visible')) {
+                    this.generateInsights();
+                }
+            }
+            
+            generateInsights() {
+                // Generate AI-like insights based on document structure
+                const insights = [];
+                
+                if (this.outline && this.outline.length > 0) {
+                    insights.push({
+                        title: 'Document Structure',
+                        content: `This document has ${this.outline.length} major sections with clear hierarchical organization.`
+                    });
+                    
+                    const h1Count = this.outline.filter(item => item.level === 'H1').length;
+                    const h2Count = this.outline.filter(item => item.level === 'H2').length;
+                    
+                    if (h1Count > 0) {
+                        insights.push({
+                            title: 'Content Organization',
+                            content: `Contains ${h1Count} main sections with ${h2Count} subsections, suggesting a well-structured academic or technical document.`
+                        });
+                    }
+                }
+                
+                insights.push({
+                    title: 'Reading Recommendation',
+                    content: `This ${this.pageCount}-page document is best approached by first reviewing the outline, then focusing on key sections.`
+                });
+                
+                const insightsHTML = insights.map(insight => `
+                    <div class="insight-item">
+                        <strong>${insight.title}:</strong> ${insight.content}
+                    </div>
+                `).join('');
+                
+                document.getElementById('insightsContent').innerHTML = insightsHTML;
+            }
+        }
+        
+        // Initialize the application
+        const pdfReader = new IntelligentPDFReader();
+    </script>
+</body>
+</html>
